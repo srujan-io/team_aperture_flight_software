@@ -8,23 +8,23 @@
 
 struct IMUData
 {
-    // acceleration
+    // Acceleration
     float ax;
     float ay;
     float az;
 
-    // gyro
+    // Gyroscope
     float gx;
     float gy;
     float gz;
 
-    // orientation 
+    // Orientation
     float roll;
     float pitch;
 
-    // total acc
+    // Total acceleration magnitude
     float accelMagnitude;
-    
+
     // Time of latest reading
     uint32_t timestamp;
 
@@ -41,7 +41,7 @@ public:
     void calibrate();
     void update();
 
-    IMUData getData();
+    IMUData getData() const;
 
 private:
     MPU9250_asukiaaa mpu;
@@ -52,6 +52,7 @@ private:
     float gyroBiasZ = 0.0f;
 
     unsigned long previousTime = 0;
+
     Kalman kalmanRoll;
     Kalman kalmanPitch;
 

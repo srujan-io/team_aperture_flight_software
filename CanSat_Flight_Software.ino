@@ -1,10 +1,6 @@
-#include "sensorManager.h"
-#include "storage.h"
+#include "gnss.h"
 
-SensorManager sensors;
-Storage storage;
-
-SensorManager sensors;
+GNSS gnss;
 
 void setup()
 {
@@ -12,43 +8,51 @@ void setup()
     delay(2000);
 
     Serial.println();
-    Serial.println("==============================");
-    Serial.println("   CanSat Sensor Test");
-    Serial.println("==============================");
+    Serial.println("================================");
+    Serial.println("          GNSS TEST");
+    Serial.println("================================");
 
-    if (!sensors.begin())
-    {
-        Serial.println("Sensor Manager initialization failed!");
-        while (1);
-    }
+    gnss.begin();
 
-    Serial.println("Sensor Manager ready!");
-
-    if (!storage.begin())
-{
-    Serial.println("Storage initialization failed!");
-}
-else
-{
-    Serial.println("Storage ready!");
-}
-
+    Serial.println("GNSS initialized.");
 }
 
 void loop()
 {
-    sensors.update();
+    // Read GNSS data
+    gnss.update();
 
-    TelemetryData data = sensors.getData();
+    static unsigned long lastPrint = 0;
 
-    Serial.println();
-    Serial.println("========== MLX90614 ==========");
+    if (millis() - lastPrint >= 1000)
+    {
+        lastPrint = millis();
 
-    Serial.print("IR/Object Temperature: ");
-    Serial.print(data.irTemperature);
-    Serial.println(" C");
+        Serial.println();
+        Serial.println("---------- GNSS ----------");
 
-    Serial.println("==============================");
+        Serial.print("Fix: ");
+        Serial.println(gnss.hasFix() ? "YES" : "NO");
 
-    delay(1000);
+        Serial.print("Satellites: ");
+        Serial.println(gnss.getSatellites());
+
+        Serial.print("Latitude: ");
+        Serial.println(gnss.getLatitude(), 6);
+
+        Serial.print("Longitude: ");
+        Serial.println(gnss.getLongitude(), 6);
+
+        Serial.print("Altitude: ");
+        Serial.print(gnss.getAltitude(), 2);
+        Serial.println(" m");
+
+        char timeBuffer[16];
+        gnss.getTime(timeBuffer, sizeof(timeBuffer));
+
+        Serial.print("UTC Time: ");
+        Serial.println(timeBuffer);
+
+        Serial.println("--------------------------");
+    }
 }

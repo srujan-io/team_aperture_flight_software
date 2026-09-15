@@ -12,6 +12,7 @@ public:
 
 private:
     const int CS_PIN = 17;
+    const char* filename = "/telemetry.csv";
 };
 
 #endif

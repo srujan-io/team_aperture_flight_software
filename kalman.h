@@ -9,21 +9,23 @@ public:
     float update(float newAngle, float newRate, float dt);
 
     void setAngle(float angle);
-    float getAngle();
+    float getAngle() const;
 
 private:
 
-    // noise
+    // Process noise
     float Q_angle;
     float Q_bias;
 
-    // measured noise
+    // Measurement noise
     float R_measure;
 
+    // State
     float angle;
     float bias;
     float rate;
 
+    // Error covariance matrix
     float P[2][2];
 };
 
