@@ -20,6 +20,10 @@ public:
 
     uint8_t getSatellites();
 
+    float getSpeed();
+    float getCourse();
+    bool hasCourse();
+
     void getTime(char *buffer, size_t bufferSize);
 
 private:

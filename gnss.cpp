@@ -7,11 +7,11 @@ GNSS::GNSS()
 void GNSS::begin()
 {
     // L89HA GNSS UART
-    // GP4 = TX
-    // GP5 = RX
+    // Pico GP1 = RX
+    // Pico GP0 = TX
 
-    Serial1.setTX(4);
-    Serial1.setRX(5);
+    Serial1.setRX(1);
+    Serial1.setTX(0);
 
     Serial1.begin(9600);
 }
@@ -60,6 +60,28 @@ uint8_t GNSS::getSatellites()
         return gps.satellites.value();
 
     return 0;
+}
+
+float GNSS::getSpeed()
+{
+    if (gps.speed.isValid())
+        return gps.speed.kmph();
+
+    return 0.0f;
+}
+
+float GNSS::getCourse()
+{
+    if (gps.course.isValid())
+        return gps.course.deg();
+
+    return 0.0f;
+}
+
+bool GNSS::hasCourse()
+{
+    return gps.course.isValid() &&
+           gps.course.age() < 2000;
 }
 
 void GNSS::getTime(char *buffer, size_t bufferSize)

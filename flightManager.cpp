@@ -1,6 +1,7 @@
 #include "flightManager.h"
 #include "config.h"
 
+
 FlightStateManager::FlightStateManager()
 {
     currentState = BOOT;
@@ -11,6 +12,11 @@ FlightStateManager::FlightStateManager()
     previousAltitude = 0.0f;
     previousAltitudeValid = false;
 }
+
+
+// ============================================================
+// BEGIN
+// ============================================================
 
 void FlightStateManager::begin()
 {
@@ -26,7 +32,14 @@ void FlightStateManager::begin()
     Serial.println("FLIGHT STATE: BOOT");
 }
 
-void FlightStateManager::update(const TelemetryData& data)
+
+// ============================================================
+// UPDATE
+// ============================================================
+
+void FlightStateManager::update(
+    const TelemetryData& data,
+    DeploymentController& deployment)
 {
     switch (currentState)
     {
@@ -62,7 +75,7 @@ void FlightStateManager::update(const TelemetryData& data)
 
         case ASCENT:
 
-            if (rocketSeparationDetected(data))
+            if (apogeeDetected(data))
             {
                 transitionTo(ROCKET_DEPLOY);
             }
@@ -82,22 +95,28 @@ void FlightStateManager::update(const TelemetryData& data)
 
         case DESCENT:
 
-            if (paragliderAltitudeReached(data))
-            {
-                transitionTo(PARAGLIDER_DEPLOY);
-            }
+    if (paragliderAltitudeReached(data))
+    {
+        transitionTo(PARAGLIDER_DEPLOY);
 
-            break;
+        deployment.startDeployment();
+    }
 
+    break;
+
+
+        // ====================================================
+        // PHASE B
+        // ====================================================
 
         case PARAGLIDER_DEPLOY:
 
-            if (paragliderStable(data))
-            {
-                transitionTo(PARAGLIDE_ACTIVE);
-            }
+    if (deployment.isDeployed())
+    {
+        transitionTo(PARAGLIDE_ACTIVE);
+    }
 
-            break;
+    break;
 
 
         case PARAGLIDE_ACTIVE:
@@ -113,8 +132,6 @@ void FlightStateManager::update(const TelemetryData& data)
         case IMPACT:
 
             // Final state.
-            // No further automatic transitions.
-
             break;
     }
 }
@@ -168,10 +185,30 @@ const char* FlightStateManager::getStateName() const
 
 
 // ============================================================
+// UPDATE TELEMETRY STATE
+// ============================================================
+
+void FlightStateManager::updateTelemetryState(
+    TelemetryData& data)
+{
+    strncpy(
+        data.flightSoftwareState,
+        getStateName(),
+        sizeof(data.flightSoftwareState) - 1
+    );
+
+    data.flightSoftwareState[
+        sizeof(data.flightSoftwareState) - 1
+    ] = '\0';
+}
+
+
+// ============================================================
 // STATE TRANSITION
 // ============================================================
 
-void FlightStateManager::transitionTo(FlightState newState)
+void FlightStateManager::transitionTo(
+    FlightState newState)
 {
     if (currentState == newState)
     {
@@ -183,7 +220,10 @@ void FlightStateManager::transitionTo(FlightState newState)
     Serial.print("FLIGHT STATE -> ");
     Serial.println(getStateName());
 
-    // Reset state-specific variables when entering a new state
+
+    // --------------------------------------------------------
+    // Entering ASCENT
+    // --------------------------------------------------------
 
     if (newState == ASCENT)
     {
@@ -193,10 +233,20 @@ void FlightStateManager::transitionTo(FlightState newState)
         previousAltitudeValid = false;
     }
 
+
+    // --------------------------------------------------------
+    // Entering ROCKET_DEPLOY
+    // --------------------------------------------------------
+
     if (newState == ROCKET_DEPLOY)
     {
         descentConfirmationCount = 0;
     }
+
+
+    // --------------------------------------------------------
+    // Entering DESCENT
+    // --------------------------------------------------------
 
     if (newState == DESCENT)
     {
@@ -214,8 +264,8 @@ bool FlightStateManager::initializationComplete()
     /*
      * Temporary implementation.
      *
-     * Later this should be connected to actual
-     * initialization/health status from the system.
+     * Later this will be connected to the actual
+     * system initialization status.
      */
 
     return true;
@@ -249,19 +299,21 @@ bool FlightStateManager::testsPassed()
 // LAUNCH DETECTION
 // ============================================================
 
-bool FlightStateManager::launchDetected(const TelemetryData& data)
+bool FlightStateManager::launchDetected(
+    const TelemetryData& data)
 {
     /*
-     * Initial launch criterion:
+     * Phase A launch criterion:
      *
-     * AGL altitude exceeds the launch threshold.
+     * AGL altitude reaches the launch threshold.
      *
-     * This threshold is currently 10 m.
+     * Current threshold = 10 m.
      */
 
     if (data.altitude >= LAUNCH_DETECTION_ALTITUDE_M)
     {
         Serial.println("Launch detected.");
+
         return true;
     }
 
@@ -270,35 +322,60 @@ bool FlightStateManager::launchDetected(const TelemetryData& data)
 
 
 // ============================================================
-// ROCKET SEPARATION / START OF DESCENT DETECTION
+// APOGEE DETECTION
 // ============================================================
 
-bool FlightStateManager::rocketSeparationDetected(
+bool FlightStateManager::apogeeDetected(
     const TelemetryData& data)
 {
     /*
-     * Detect a transition from increasing altitude
-     * to decreasing altitude.
+     * Phase A:
      *
-     * We require multiple consecutive decreasing
-     * altitude samples to avoid reacting to noise.
+     * We do not directly detect the physical rocket
+     * separation mechanism here.
+     *
+     * Instead, we detect apogee and the beginning
+     * of the descent phase using:
+     *
+     * 1. Altitude begins decreasing.
+     * 2. Multiple consecutive samples confirm it.
+     * 3. Vertical velocity is downward.
      */
+
+
+    // --------------------------------------------------------
+    // First altitude sample
+    // --------------------------------------------------------
 
     if (!previousAltitudeValid)
     {
-        previousAltitude = data.altitude;
-        previousAltitudeValid = true;
+        previousAltitude =
+            data.altitude;
+
+        previousAltitudeValid =
+            true;
 
         return false;
     }
 
+
+    // --------------------------------------------------------
+    // Calculate altitude change
+    // --------------------------------------------------------
+
     float altitudeChange =
         data.altitude - previousAltitude;
 
-    previousAltitude = data.altitude;
+    previousAltitude =
+        data.altitude;
 
 
-    if (altitudeChange < 0.0f)
+    // --------------------------------------------------------
+    // Check for downward movement
+    // --------------------------------------------------------
+
+    if (altitudeChange < 0.0f &&
+        data.velocity < 0.0f)
     {
         separationConfirmationCount++;
 
@@ -308,7 +385,8 @@ bool FlightStateManager::rocketSeparationDetected(
             separationConfirmationCount = 0;
 
             Serial.println(
-                "Rocket separation / descent detected.");
+                "Apogee detected. Descent beginning."
+            );
 
             return true;
         }
@@ -318,28 +396,35 @@ bool FlightStateManager::rocketSeparationDetected(
         separationConfirmationCount = 0;
     }
 
+
     return false;
 }
 
 
 // ============================================================
-// DESCENT CONFIRMATION
+// STABLE PRIMARY PARACHUTE DESCENT
 // ============================================================
 
 bool FlightStateManager::descentConfirmed(
     const TelemetryData& data)
 {
     /*
+     * Phase A:
+     *
+     * Confirm sustained downward velocity after
+     * the apogee / descent transition.
+     *
      * Velocity convention:
      *
-     * Positive  = upward
-     * Negative  = downward
+     * Positive = upward
+     * Negative = downward
      *
-     * Example:
-     * -15 m/s = descending at 15 m/s
+     * Current threshold:
+     * velocity <= -2 m/s
      */
 
-    if (data.velocity <= DESCENT_VELOCITY_THRESHOLD_MS)
+    if (data.velocity <=
+        DESCENT_VELOCITY_THRESHOLD_MS)
     {
         descentConfirmationCount++;
 
@@ -349,7 +434,8 @@ bool FlightStateManager::descentConfirmed(
             descentConfirmationCount = 0;
 
             Serial.println(
-                "Stable parachute descent confirmed.");
+                "Stable primary parachute descent confirmed."
+            );
 
             return true;
         }
@@ -359,67 +445,53 @@ bool FlightStateManager::descentConfirmed(
         descentConfirmationCount = 0;
     }
 
+
     return false;
 }
 
 
 // ============================================================
-// PARAGLIDER DEPLOYMENT ALTITUDE
+// 600 m AGL PARAGLIDER TRIGGER
 // ============================================================
 
 bool FlightStateManager::paragliderAltitudeReached(
     const TelemetryData& data)
 {
-    /*
-     * Altitude is assumed to be AGL.
-     *
-     * Trigger:
-     * altitude <= 600 m
-     */
-
-    if (data.altitude <= PARAGLIDER_DEPLOY_ALTITUDE_M)
+    if (data.altitude < -50.0f ||
+        data.altitude > MAX_VALID_ALTITUDE_M)
     {
-        Serial.println(
-            "Paraglider deployment altitude reached.");
-
-        return true;
+        return false;
     }
 
-    return false;
+    // Only trigger while descending.
+    if (data.velocity >= 0.0f)
+    {
+        return false;
+    }
+
+    return data.altitude <= PARAGLIDER_DEPLOYMENT_TRIGGER_M;
+
 }
 
 
 // ============================================================
-// PARAGLIDER STABILITY
+// PHASE B PLACEHOLDER
 // ============================================================
 
-bool FlightStateManager::paragliderStable(
-    const TelemetryData& data)
-{
-    /*
-     * Placeholder for Phase A.
-     *
-     * Later this will verify that the paraglider
-     * has inflated and the vehicle has entered
-     * a stable glide before activating guidance.
-     */
 
-    return false;
-}
 
 
 // ============================================================
-// IMPACT DETECTION
+// PHASE B PLACEHOLDER
 // ============================================================
 
 bool FlightStateManager::impactDetected(
     const TelemetryData& data)
 {
     /*
-     * Placeholder for later.
+     * Phase B / end-of-mission.
      *
-     * Impact detection will eventually combine
-     * altitude, velocity and IMU information.
+     * Not implemented yet.
      */
 
     return false;

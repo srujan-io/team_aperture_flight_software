@@ -127,53 +127,59 @@ void SensorManager::update()
     // =================================================
 
     if (bme280Available)
-{
-    bme280.update();
-
-    data.altitude =
-        bme280.getAltitude();
-
-    data.pressure =
-        bme280.getPressure();
-
-    data.temperature =
-        bme280.getTemperature();
-
-    data.humidity =
-        bme280.getHumidity();
-
-
-    // ------------------------------------------------
-    // Vertical velocity
-    // Positive = upward
-    // Negative = downward
-    // ------------------------------------------------
-
-    unsigned long currentTime = millis();
-
-    if (previousAltitudeValid)
     {
-        float dt =
-            (currentTime - previousAltitudeTime) / 1000.0f;
+        bme280.update();
 
-        if (dt > 0.0f)
+        data.altitude =
+            bme280.getAltitude();
+
+        data.pressure =
+            bme280.getPressure();
+
+        data.temperature =
+            bme280.getTemperature();
+
+        data.humidity =
+            bme280.getHumidity();
+
+
+        // ------------------------------------------------
+        // Vertical velocity
+        //
+        // Positive = upward
+        // Negative = downward
+        // ------------------------------------------------
+
+        unsigned long currentTime =
+            millis();
+
+        if (previousAltitudeValid)
         {
-            data.velocity =
-                (data.altitude - previousAltitude) / dt;
+            float dt =
+                (currentTime - previousAltitudeTime)
+                / 1000.0f;
+
+            if (dt > 0.0f)
+            {
+                data.velocity =
+                    (data.altitude - previousAltitude)
+                    / dt;
+            }
         }
-    }
-    else
-    {
-        data.velocity = 0.0f;
-        previousAltitudeValid = true;
-    }
+        else
+        {
+            data.velocity = 0.0f;
 
-    previousAltitude =
-        data.altitude;
+            previousAltitudeValid = true;
+        }
 
-    previousAltitudeTime =
-        currentTime;
-}
+
+        previousAltitude =
+            data.altitude;
+
+        previousAltitudeTime =
+            currentTime;
+    }
 
 
     // =================================================
@@ -276,6 +282,7 @@ void SensorManager::update()
 
             char timeBuffer[16];
 
+
             if (gnss.getTime(
                     timeBuffer,
                     sizeof(timeBuffer)))
@@ -285,6 +292,7 @@ void SensorManager::update()
                     timeBuffer,
                     sizeof(data.gnssTime) - 1
                 );
+
 
                 data.gnssTime[
                     sizeof(data.gnssTime) - 1
@@ -355,7 +363,16 @@ bool SensorManager::calibrateBarometer()
     );
 
 
+    // ------------------------------------------------
+    // Reset Phase A altitude and velocity reference
+    // ------------------------------------------------
+
     data.altitude = 0.0f;
+    data.velocity = 0.0f;
+
+    previousAltitude = 0.0f;
+    previousAltitudeTime = millis();
+    previousAltitudeValid = false;
 
 
     Serial.print(

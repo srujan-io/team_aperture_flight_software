@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 #include "telemetryData.h"
+#include "deployment.h"
 
 enum FlightState
 {
@@ -20,37 +21,111 @@ enum FlightState
 class FlightStateManager
 {
 public:
+
     FlightStateManager();
 
     void begin();
-    void update(const TelemetryData& data);
+
+    void update(
+        const TelemetryData& data,
+        DeploymentController& deployment
+    );
+
+    void updateTelemetryState(
+        TelemetryData& data
+    );
 
     FlightState getState() const;
+
     const char* getStateName() const;
 
-    void transitionTo(FlightState newState);
+    void transitionTo(
+        FlightState newState
+    );
 
 private:
+
     FlightState currentState;
 
-    // Flight-state confirmation counters
-    uint8_t separationConfirmationCount;
+    uint8_t apogeeConfirmationCount;
     uint8_t descentConfirmationCount;
 
-    // Previous altitude for detecting altitude trend
     float previousAltitude;
     bool previousAltitudeValid;
 
-    // State transition helpers
     bool initializationComplete();
     bool testsPassed();
 
-    bool launchDetected(const TelemetryData& data);
-    bool rocketSeparationDetected(const TelemetryData& data);
-    bool descentConfirmed(const TelemetryData& data);
-    bool paragliderAltitudeReached(const TelemetryData& data);
-    bool paragliderStable(const TelemetryData& data);
-    bool impactDetected(const TelemetryData& data);
+    bool launchDetected(
+        const TelemetryData& data
+    );
+
+    bool apogeeDetected(
+        const TelemetryData& data
+    );
+
+    bool descentConfirmed(
+        const TelemetryData& data
+    );
+
+    bool paragliderAltitudeReached(
+        const TelemetryData& data
+    );
+
+    bool impactDetected(
+        const TelemetryData& data
+    );
+};
+
+
+private:
+
+    FlightState currentState;
+
+
+    // ============================================================
+    // FLIGHT-STATE CONFIRMATION COUNTERS
+    // ============================================================
+    uint8_t apogeeConfirmationCount;
+    uint8_t descentConfirmationCount;
+
+
+    // ============================================================
+    // PREVIOUS ALTITUDE
+    // ============================================================
+
+    float previousAltitude;
+    bool previousAltitudeValid;
+
+
+    // ============================================================
+    // STATE TRANSITION HELPERS
+    // ============================================================
+
+    bool initializationComplete();
+    bool testsPassed();
+
+    bool launchDetected(
+        const TelemetryData& data
+    );
+
+    bool apogeeDetected(
+        const TelemetryData& data
+    );
+
+    bool descentConfirmed(
+        const TelemetryData& data
+    );
+
+    bool paragliderAltitudeReached(
+        const TelemetryData& data
+    );
+
+    
+
+    bool impactDetected(
+        const TelemetryData& data
+    );
 };
 
 #endif
