@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 #include <Wire.h>
-#include <Adafruit_ENS160.h>
+#include <ScioSense_ENS160.h>
 
 class ENS160Sensor
 {

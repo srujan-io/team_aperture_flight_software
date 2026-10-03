@@ -1,9 +1,7 @@
 #include "flywheel.h"
 #include "config.h"
 
-#include <Arduino.h>
 #include <math.h>
-
 
 FlywheelController::FlywheelController()
 {
@@ -19,123 +17,99 @@ FlywheelController::FlywheelController()
     kp = FLYWHEEL_KP;
 }
 
-
 bool FlywheelController::begin()
 {
     if (initialized)
-    {
         return true;
-    }
 
     pinMode(enablePin, OUTPUT);
     pinMode(in1Pin, OUTPUT);
     pinMode(in2Pin, OUTPUT);
 
-    stop();
+    setMotor(0);
 
     initialized = true;
+    active = true;
 
     return true;
 }
 
-
 void FlywheelController::update(float gyroZ)
 {
     if (!initialized)
-    {
         return;
-    }
 
-    active = true;
+    motorCommand = calculateCommand(gyroZ);
 
-    int command = calculateCommand(gyroZ);
-
-    setMotor(command);
+    setMotor(motorCommand);
 }
-
 
 int FlywheelController::calculateCommand(float gyroZ)
 {
-    // Desired angular rate is 0 °/s.
+    // Desired Z-axis angular velocity = 0
     float error = -gyroZ;
 
-    // Deadband around zero angular rate.
+    // Apply configured physical direction
+    error *= FLYWHEEL_DIRECTION;
+
+    // Ignore very small rotation rates
     if (fabs(error) <= FLYWHEEL_DEADBAND_DPS)
-    {
         return 0;
-    }
 
-    // Proportional control.
-    float output = kp * error;
+    // Proportional control
+    float command = kp * error;
 
-    // Limit output.
-    if (output > FLYWHEEL_MAX_PWM)
-    {
-        output = FLYWHEEL_MAX_PWM;
-    }
+    // Limit command
+    if (command > FLYWHEEL_MAX_PWM)
+        command = FLYWHEEL_MAX_PWM;
 
-    if (output < -FLYWHEEL_MAX_PWM)
-    {
-        output = -FLYWHEEL_MAX_PWM;
-    }
+    if (command < -FLYWHEEL_MAX_PWM)
+        command = -FLYWHEEL_MAX_PWM;
 
-    return (int)output;
+    return (int)command;
 }
-
 
 void FlywheelController::setMotor(int command)
 {
-    motorCommand = command;
+    if (command > 0)
+    {
+        digitalWrite(in1Pin, HIGH);
+        digitalWrite(in2Pin, LOW);
 
-    if (command == 0)
+        analogWrite(enablePin, command);
+    }
+    else if (command < 0)
+    {
+        digitalWrite(in1Pin, LOW);
+        digitalWrite(in2Pin, HIGH);
+
+        analogWrite(enablePin, -command);
+    }
+    else
     {
         digitalWrite(in1Pin, LOW);
         digitalWrite(in2Pin, LOW);
 
         analogWrite(enablePin, 0);
-
-        return;
     }
-
-    if (command > 0)
-    {
-        digitalWrite(in1Pin, HIGH);
-        digitalWrite(in2Pin, LOW);
-    }
-    else
-    {
-        digitalWrite(in1Pin, LOW);
-        digitalWrite(in2Pin, HIGH);
-    }
-
-    int pwm = abs(command);
-
-    if (pwm > FLYWHEEL_MAX_PWM)
-    {
-        pwm = FLYWHEEL_MAX_PWM;
-    }
-
-    analogWrite(enablePin, pwm);
 }
-
 
 void FlywheelController::stop()
 {
+    if (!initialized)
+        return;
+
     motorCommand = 0;
+
+    setMotor(0);
+
     active = false;
-
-    digitalWrite(in1Pin, LOW);
-    digitalWrite(in2Pin, LOW);
-
-    analogWrite(enablePin, 0);
 }
-
 
 int FlywheelController::getMotorCommand() const
 {
     return motorCommand;
 }
-
 
 bool FlywheelController::isActive() const
 {

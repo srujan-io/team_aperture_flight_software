@@ -1,4 +1,5 @@
 #include "gnss.h"
+#include "config.h"
 
 GNSS::GNSS()
 {
@@ -81,7 +82,7 @@ float GNSS::getCourse()
 bool GNSS::hasCourse()
 {
     return gps.course.isValid() &&
-           gps.course.age() < 2000;
+           gps.course.age() < GNSS_MAX_COURSE_AGE_MS;
 }
 
 void GNSS::getTime(char *buffer, size_t bufferSize)

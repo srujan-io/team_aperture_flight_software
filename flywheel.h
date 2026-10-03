@@ -6,21 +6,17 @@
 class FlywheelController
 {
 public:
-
     FlywheelController();
 
     bool begin();
 
     void update(float gyroZ);
-
     void stop();
 
     int getMotorCommand() const;
-
     bool isActive() const;
 
 private:
-
     int enablePin;
     int in1Pin;
     int in2Pin;
@@ -33,7 +29,6 @@ private:
     float kp;
 
     int calculateCommand(float gyroZ);
-
     void setMotor(int command);
 };
 

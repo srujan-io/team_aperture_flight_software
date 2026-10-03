@@ -149,7 +149,6 @@ float GuidanceController::calculateHeadingError(
     float error =
         targetBearing - currentCourse;
 
-    // Normalize to [-180, +180]
     while (error > 180.0f)
         error -= 360.0f;
 
