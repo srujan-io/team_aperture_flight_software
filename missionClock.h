@@ -15,11 +15,13 @@ public:
 
     uint32_t getTimestamp() const;
 
-    // Reset/recovery support
+    // Reset / recovery support
     void setTimestamp(uint32_t timestamp);
 
+    // Set clock from GNSS UTC time
     bool setUTC(const String& utc);
 
+    // Parse HH:MM:SS
     bool parseUTC(
         const String& utc,
         uint8_t& hour,

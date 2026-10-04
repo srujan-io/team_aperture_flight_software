@@ -18,6 +18,7 @@ public:
 
     bool isDeploying() const;
     bool isDeployed() const;
+    bool isInflationComplete() const;
 
 private:
 
@@ -32,6 +33,7 @@ private:
     bool deployed;
 
     unsigned long deploymentStartTime;
+    unsigned long inflationStartTime;
 };
 
 #endif

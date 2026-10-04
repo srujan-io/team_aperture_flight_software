@@ -12,8 +12,11 @@ DeploymentController::DeploymentController()
     deployed = false;
 
     deploymentStartTime = 0;
+    inflationStartTime = 0;
 }
 
+
+// BEGIN
 
 bool DeploymentController::begin()
 {
@@ -23,6 +26,8 @@ bool DeploymentController::begin()
     }
 
     mg90.attach(servoPin);
+
+    // Initial locked position
     mg90.write(idleAngle);
 
     initialized = true;
@@ -31,6 +36,8 @@ bool DeploymentController::begin()
 }
 
 
+// START DEPLOYMENT
+
 bool DeploymentController::startDeployment()
 {
     if (!initialized)
@@ -38,20 +45,27 @@ bool DeploymentController::startDeployment()
         return false;
     }
 
-    // Deployment is one-shot.
+    // Deployment is one-shot
     if (deploying || deployed)
     {
         return false;
     }
 
+    Serial.println("MG90: Deployment started.");
+
+    // Move rack-and-pinion mechanism
     mg90.write(deployAngle);
 
     deploymentStartTime = millis();
+
     deploying = true;
+    deployed = false;
 
     return true;
 }
 
+
+// UPDATE
 
 void DeploymentController::update()
 {
@@ -63,13 +77,22 @@ void DeploymentController::update()
     unsigned long elapsed =
         millis() - deploymentStartTime;
 
+    // MG90 actuation complete
     if (elapsed >= MG90_ACTUATION_TIME_MS)
     {
         deploying = false;
         deployed = true;
+
+        // Start paraglider inflation timer
+        inflationStartTime = millis();
+
+        Serial.println("MG90: Deployment complete.");
+        Serial.println("Paraglider inflation started.");
     }
 }
 
+
+// DEPLOYMENT STATUS
 
 bool DeploymentController::isDeploying() const
 {
@@ -80,4 +103,21 @@ bool DeploymentController::isDeploying() const
 bool DeploymentController::isDeployed() const
 {
     return deployed;
+}
+
+
+// INFLATION STATUS
+
+bool DeploymentController::isInflationComplete() const
+{
+    if (!deployed)
+    {
+        return false;
+    }
+
+    unsigned long inflationElapsed =
+        millis() - inflationStartTime;
+
+    return inflationElapsed >=
+           PARAGLIDER_INFLATION_TIME_MS;
 }

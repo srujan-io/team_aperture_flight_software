@@ -1,13 +1,24 @@
 #include "gnss.h"
 #include "config.h"
 
+
 GNSS::GNSS()
 {
+    ready = false;
+
+    startTime = 0;
+
+    acquisitionTime = 0;
 }
+
+
+// BEGIN
+
 
 void GNSS::begin()
 {
     // L89HA GNSS UART
+    //
     // Pico GP1 = RX
     // Pico GP0 = TX
 
@@ -15,7 +26,17 @@ void GNSS::begin()
     Serial1.setTX(0);
 
     Serial1.begin(9600);
+
+    // Start GNSS acquisition timer.
+    startTime = millis();
+
+    ready = false;
+    acquisitionTime = 0;
 }
+
+
+
+// UPDATE
 
 void GNSS::update()
 {
@@ -23,13 +44,84 @@ void GNSS::update()
     {
         gps.encode(Serial1.read());
     }
+
+
+
+    // GNSS READINESS
+
+
+    if (!ready)
+    {
+        bool fixValid =
+            gps.location.isValid() &&
+            gps.location.age() < 2000;
+
+        bool satellitesValid =
+            gps.satellites.isValid() &&
+            gps.satellites.value() >=
+                GNSS_MIN_SATELLITES;
+
+
+        if (fixValid && satellitesValid)
+        {
+            ready = true;
+
+            acquisitionTime =
+                millis() - startTime;
+
+            Serial.println();
+            Serial.println("==============================");
+            Serial.println("GNSS ACQUISITION COMPLETE");
+            Serial.print("Satellites: ");
+            Serial.println(
+                gps.satellites.value()
+            );
+
+            Serial.print("Acquisition time: ");
+            Serial.print(acquisitionTime);
+            Serial.println(" ms");
+
+            Serial.println("==============================");
+            Serial.println();
+        }
+    }
 }
+
+
+
+// GNSS FIX
+
 
 bool GNSS::hasFix()
 {
     return gps.location.isValid() &&
            gps.location.age() < 2000;
 }
+
+
+
+// GNSS READY
+
+
+bool GNSS::isReady()
+{
+    return ready;
+}
+
+
+
+// ACQUISITION TIME
+
+
+unsigned long GNSS::getAcquisitionTime()
+{
+    return acquisitionTime;
+}
+
+
+
+// POSITION
+
 
 double GNSS::getLatitude()
 {
@@ -39,6 +131,7 @@ double GNSS::getLatitude()
     return 0.0;
 }
 
+
 double GNSS::getLongitude()
 {
     if (gps.location.isValid())
@@ -46,6 +139,7 @@ double GNSS::getLongitude()
 
     return 0.0;
 }
+
 
 double GNSS::getAltitude()
 {
@@ -55,6 +149,11 @@ double GNSS::getAltitude()
     return 0.0;
 }
 
+
+
+// SATELLITES
+
+
 uint8_t GNSS::getSatellites()
 {
     if (gps.satellites.isValid())
@@ -62,6 +161,11 @@ uint8_t GNSS::getSatellites()
 
     return 0;
 }
+
+
+
+// SPEED
+
 
 float GNSS::getSpeed()
 {
@@ -71,6 +175,11 @@ float GNSS::getSpeed()
     return 0.0f;
 }
 
+
+
+// COURSE
+
+
 float GNSS::getCourse()
 {
     if (gps.course.isValid())
@@ -79,23 +188,46 @@ float GNSS::getCourse()
     return 0.0f;
 }
 
+
 bool GNSS::hasCourse()
 {
     return gps.course.isValid() &&
-           gps.course.age() < GNSS_MAX_COURSE_AGE_MS;
+           gps.course.age() <
+               GNSS_MAX_COURSE_AGE_MS;
 }
 
-void GNSS::getTime(char *buffer, size_t bufferSize)
+
+
+// TIME
+
+
+void GNSS::getTime(
+    char *buffer,
+    size_t bufferSize
+)
 {
-    if (buffer == nullptr || bufferSize == 0)
+    if (buffer == nullptr ||
+        bufferSize == 0)
+    {
         return;
+    }
+
 
     if (!gps.time.isValid())
     {
-        strncpy(buffer, "NO_DATA", bufferSize);
-        buffer[bufferSize - 1] = '\0';
+        strncpy(
+            buffer,
+            "NO_DATA",
+            bufferSize
+        );
+
+        buffer[
+            bufferSize - 1
+        ] = '\0';
+
         return;
     }
+
 
     snprintf(
         buffer,

@@ -6,6 +6,7 @@
 class GuidanceController
 {
 public:
+
     GuidanceController();
 
     void begin();
@@ -21,7 +22,11 @@ public:
     float getBearingToTarget() const;
     float getHeadingError() const;
 
+    bool isCourseValid() const;
+
+
 private:
+
     double targetLatitude;
     double targetLongitude;
 
@@ -30,6 +35,11 @@ private:
     float headingError;
 
     bool courseValid;
+
+
+
+    // CALCULATIONS
+
 
     float calculateDistance(
         double lat1,

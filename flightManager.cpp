@@ -1,28 +1,25 @@
 #include "flightManager.h"
 #include "config.h"
 
+#include <string.h>
+#include <math.h>
 
 FlightStateManager::FlightStateManager()
 {
     currentState = BOOT;
 
-    separationConfirmationCount = 0;
+    dropConfirmationCount = 0;
     descentConfirmationCount = 0;
 
     previousAltitude = 0.0f;
     previousAltitudeValid = false;
 }
 
-
-// ============================================================
-// BEGIN
-// ============================================================
-
 void FlightStateManager::begin()
 {
     currentState = BOOT;
 
-    separationConfirmationCount = 0;
+    dropConfirmationCount = 0;
     descentConfirmationCount = 0;
 
     previousAltitude = 0.0f;
@@ -32,17 +29,17 @@ void FlightStateManager::begin()
     Serial.println("FLIGHT STATE: BOOT");
 }
 
-
-// ============================================================
-// UPDATE
-// ============================================================
-
 void FlightStateManager::update(
     const TelemetryData& data,
-    DeploymentController& deployment)
+    DeploymentController& deployment
+)
 {
     switch (currentState)
     {
+        // ----------------------------------------------------
+        // BOOT
+        // ----------------------------------------------------
+
         case BOOT:
 
             if (initializationComplete())
@@ -52,6 +49,10 @@ void FlightStateManager::update(
 
             break;
 
+
+        // ----------------------------------------------------
+        // TEST MODE
+        // ----------------------------------------------------
 
         case TEST_MODE:
 
@@ -63,27 +64,27 @@ void FlightStateManager::update(
             break;
 
 
+        // ----------------------------------------------------
+        // LAUNCH PAD
+        // CANSat is still attached to drone
+        // ----------------------------------------------------
+
         case LAUNCH_PAD:
 
-            if (launchDetected(data))
+            if (dropDetected(data))
             {
-                transitionTo(ASCENT);
+                transitionTo(DROP_DETECTED);
             }
 
             break;
 
 
-        case ASCENT:
+        // ----------------------------------------------------
+        // DROP DETECTED
+        // Confirm that this is actually descent
+        // ----------------------------------------------------
 
-            if (apogeeDetected(data))
-            {
-                transitionTo(ROCKET_DEPLOY);
-            }
-
-            break;
-
-
-        case ROCKET_DEPLOY:
+        case DROP_DETECTED:
 
             if (descentConfirmed(data))
             {
@@ -93,31 +94,49 @@ void FlightStateManager::update(
             break;
 
 
+        // ----------------------------------------------------
+        // PRIMARY PARACHUTE DESCENT
+        // ----------------------------------------------------
+
         case DESCENT:
 
-    if (paragliderAltitudeReached(data))
-    {
-        transitionTo(PARAGLIDER_DEPLOY);
+            if (paragliderAltitudeReached(data))
+            {
+                if (deployment.startDeployment())
+                {
+                    transitionTo(PARAGLIDER_DEPLOY);
+                }
+                else
+                {
+                    Serial.println(
+                        "ERROR: Paraglider deployment failed to start."
+                    );
+                }
+            }
 
-        deployment.startDeployment();
-    }
-
-    break;
+            break;
 
 
-        // ====================================================
-        // PHASE B
-        // ====================================================
+        // ----------------------------------------------------
+        // PARAGLIDER DEPLOYMENT / INFLATION
+        // ----------------------------------------------------
 
         case PARAGLIDER_DEPLOY:
 
-    if (deployment.isDeployed())
-    {
-        transitionTo(PARAGLIDE_ACTIVE);
-    }
+        deployment.update();
 
-    break;
+        if (deployment.isInflationComplete())
+        {
+            transitionTo(PARAGLIDE_ACTIVE);
+        }
 
+        break;
+
+
+        // ----------------------------------------------------
+        // PARAGLIDER ACTIVE
+        // Guidance + steering can operate here
+        // ----------------------------------------------------
 
         case PARAGLIDE_ACTIVE:
 
@@ -129,23 +148,21 @@ void FlightStateManager::update(
             break;
 
 
+        // ----------------------------------------------------
+        // IMPACT
+        // Mission finished
+        // ----------------------------------------------------
+
         case IMPACT:
 
-            // Final state.
             break;
     }
 }
-
-
-// ============================================================
-// STATE INFORMATION
-// ============================================================
 
 FlightState FlightStateManager::getState() const
 {
     return currentState;
 }
-
 
 const char* FlightStateManager::getStateName() const
 {
@@ -160,11 +177,8 @@ const char* FlightStateManager::getStateName() const
         case LAUNCH_PAD:
             return "LAUNCH_PAD";
 
-        case ASCENT:
-            return "ASCENT";
-
-        case ROCKET_DEPLOY:
-            return "ROCKET_DEPLOY";
+        case DROP_DETECTED:
+            return "DROP_DETECTED";
 
         case DESCENT:
             return "DESCENT";
@@ -183,13 +197,9 @@ const char* FlightStateManager::getStateName() const
     }
 }
 
-
-// ============================================================
-// UPDATE TELEMETRY STATE
-// ============================================================
-
 void FlightStateManager::updateTelemetryState(
-    TelemetryData& data)
+    TelemetryData& data
+)
 {
     strncpy(
         data.flightSoftwareState,
@@ -202,162 +212,125 @@ void FlightStateManager::updateTelemetryState(
     ] = '\0';
 }
 
-
-// ============================================================
-// STATE TRANSITION
-// ============================================================
-
 void FlightStateManager::transitionTo(
-    FlightState newState)
+    FlightState newState
+)
 {
     if (currentState == newState)
-    {
         return;
-    }
 
     currentState = newState;
 
     Serial.print("FLIGHT STATE -> ");
     Serial.println(getStateName());
 
-
     // --------------------------------------------------------
-    // Entering ASCENT
+    // DROP DETECTED
     // --------------------------------------------------------
 
-    if (newState == ASCENT)
+    if (newState == DROP_DETECTED)
     {
-        separationConfirmationCount = 0;
+        dropConfirmationCount = 0;
         descentConfirmationCount = 0;
 
         previousAltitudeValid = false;
+
+        Serial.println("Drone release detected.");
     }
 
-
     // --------------------------------------------------------
-    // Entering ROCKET_DEPLOY
-    // --------------------------------------------------------
-
-    if (newState == ROCKET_DEPLOY)
-    {
-        descentConfirmationCount = 0;
-    }
-
-
-    // --------------------------------------------------------
-    // Entering DESCENT
+    // DESCENT
     // --------------------------------------------------------
 
     if (newState == DESCENT)
     {
         descentConfirmationCount = 0;
+
+        Serial.println(
+            "Primary parachute descent confirmed."
+        );
+    }
+
+    // --------------------------------------------------------
+    // PARAGLIDER DEPLOY
+    // --------------------------------------------------------
+
+    if (newState == PARAGLIDER_DEPLOY)
+    {
+        Serial.println(
+            "Paraglider deployment initiated."
+        );
+    }
+
+    // --------------------------------------------------------
+    // PARAGLIDE ACTIVE
+    // --------------------------------------------------------
+
+    if (newState == PARAGLIDE_ACTIVE)
+    {
+        Serial.println(
+            "Paraglider active. Guidance enabled."
+        );
+    }
+
+    // --------------------------------------------------------
+    // IMPACT
+    // --------------------------------------------------------
+
+    if (newState == IMPACT)
+    {
+        Serial.println(
+            "Impact detected. Mission complete."
+        );
     }
 }
-
-
-// ============================================================
-// BOOT
-// ============================================================
 
 bool FlightStateManager::initializationComplete()
 {
     /*
      * Temporary implementation.
      *
-     * Later this will be connected to the actual
-     * system initialization status.
+     * Later this should check the actual subsystem
+     * initialization status.
      */
 
     return true;
 }
-
-
-// ============================================================
-// TEST MODE
-// ============================================================
 
 bool FlightStateManager::testsPassed()
 {
     /*
      * Temporary implementation.
      *
-     * Later this should verify:
-     * - BME280
-     * - IMU
-     * - GNSS
-     * - SD
-     * - LoRa
-     * - power monitoring
-     * - servos
+     * Later this will be connected to the actual
+     * pre-flight / launch-pad checks.
      */
 
     return true;
 }
 
-
-// ============================================================
-// LAUNCH DETECTION
-// ============================================================
-
-bool FlightStateManager::launchDetected(
-    const TelemetryData& data)
+bool FlightStateManager::dropDetected(
+    const TelemetryData& data
+)
 {
-    /*
-     * Phase A launch criterion:
-     *
-     * AGL altitude reaches the launch threshold.
-     *
-     * Current threshold = 10 m.
-     */
-
-    if (data.altitude >= LAUNCH_DETECTION_ALTITUDE_M)
+    // Reject impossible altitude values
+    if (data.altitude < -50.0f ||
+        data.altitude > MAX_VALID_ALTITUDE_M)
     {
-        Serial.println("Launch detected.");
-
-        return true;
+        return false;
     }
 
-    return false;
-}
-
-
-// ============================================================
-// APOGEE DETECTION
-// ============================================================
-
-bool FlightStateManager::apogeeDetected(
-    const TelemetryData& data)
-{
-    /*
-     * Phase A:
-     *
-     * We do not directly detect the physical rocket
-     * separation mechanism here.
-     *
-     * Instead, we detect apogee and the beginning
-     * of the descent phase using:
-     *
-     * 1. Altitude begins decreasing.
-     * 2. Multiple consecutive samples confirm it.
-     * 3. Vertical velocity is downward.
-     */
-
-
     // --------------------------------------------------------
-    // First altitude sample
+    // First valid altitude sample
     // --------------------------------------------------------
 
     if (!previousAltitudeValid)
     {
-        previousAltitude =
-            data.altitude;
-
-        previousAltitudeValid =
-            true;
+        previousAltitude = data.altitude;
+        previousAltitudeValid = true;
 
         return false;
     }
-
 
     // --------------------------------------------------------
     // Calculate altitude change
@@ -366,26 +339,35 @@ bool FlightStateManager::apogeeDetected(
     float altitudeChange =
         data.altitude - previousAltitude;
 
-    previousAltitude =
-        data.altitude;
-
+    previousAltitude = data.altitude;
 
     // --------------------------------------------------------
-    // Check for downward movement
+    // Drone release should result in:
+    //
+    // 1. Altitude decreasing
+    // 2. Negative vertical velocity
+    //
+    // We require multiple consecutive samples to avoid
+    // triggering because of one noisy BME280 reading.
     // --------------------------------------------------------
 
-    if (altitudeChange < 0.0f &&
-        data.velocity < 0.0f)
+    bool altitudeDecreasing =
+        altitudeChange < 0.0f;
+
+    bool descending =
+        data.velocity < DESCENT_VELOCITY_THRESHOLD_MS;
+
+    if (altitudeDecreasing && descending)
     {
-        separationConfirmationCount++;
+        dropConfirmationCount++;
 
-        if (separationConfirmationCount >=
-            SEPARATION_CONFIRMATION_SAMPLES)
+        if (dropConfirmationCount >=
+            DROP_CONFIRMATION_SAMPLES)
         {
-            separationConfirmationCount = 0;
+            dropConfirmationCount = 0;
 
             Serial.println(
-                "Apogee detected. Descent beginning."
+                "Drone release confirmed."
             );
 
             return true;
@@ -393,38 +375,21 @@ bool FlightStateManager::apogeeDetected(
     }
     else
     {
-        separationConfirmationCount = 0;
+        dropConfirmationCount = 0;
     }
-
 
     return false;
 }
 
-
-// ============================================================
-// STABLE PRIMARY PARACHUTE DESCENT
-// ============================================================
-
 bool FlightStateManager::descentConfirmed(
-    const TelemetryData& data)
+    const TelemetryData& data
+)
 {
-    /*
-     * Phase A:
-     *
-     * Confirm sustained downward velocity after
-     * the apogee / descent transition.
-     *
-     * Velocity convention:
-     *
-     * Positive = upward
-     * Negative = downward
-     *
-     * Current threshold:
-     * velocity <= -2 m/s
-     */
+    // --------------------------------------------------------
+    // Confirm sustained downward velocity
+    // --------------------------------------------------------
 
-    if (data.velocity <=
-        DESCENT_VELOCITY_THRESHOLD_MS)
+    if (data.velocity <= DESCENT_VELOCITY_THRESHOLD_MS)
     {
         descentConfirmationCount++;
 
@@ -445,53 +410,51 @@ bool FlightStateManager::descentConfirmed(
         descentConfirmationCount = 0;
     }
 
-
     return false;
 }
 
-
-// ============================================================
-// 600 m AGL PARAGLIDER TRIGGER
-// ============================================================
-
 bool FlightStateManager::paragliderAltitudeReached(
-    const TelemetryData& data)
+    const TelemetryData& data
+)
 {
+    // Reject impossible altitude values
     if (data.altitude < -50.0f ||
         data.altitude > MAX_VALID_ALTITUDE_M)
     {
         return false;
     }
 
-    // Only trigger while descending.
+    // We should only deploy while descending
     if (data.velocity >= 0.0f)
     {
         return false;
     }
 
-    return data.altitude <= PARAGLIDER_DEPLOYMENT_TRIGGER_M;
+    // --------------------------------------------------------
+    // Secondary mechanism activation
+    //
+    // Target altitude:
+    // 600 m ± 10 m
+    //
+    // Current configuration uses:
+    // 600 + 10 = 610 m
+    // --------------------------------------------------------
 
+    return data.altitude <=
+           PARAGLIDER_DEPLOYMENT_TRIGGER_M;
 }
 
-
-// ============================================================
-// PHASE B PLACEHOLDER
-// ============================================================
-
-
-
-
-// ============================================================
-// PHASE B PLACEHOLDER
-// ============================================================
-
 bool FlightStateManager::impactDetected(
-    const TelemetryData& data)
+    const TelemetryData& data
+)
 {
     /*
-     * Phase B / end-of-mission.
+     * TODO:
      *
-     * Not implemented yet.
+     * We will implement proper impact detection using
+     * altitude + acceleration + velocity + persistence.
+     *
+     * Do NOT use a random acceleration threshold here yet.
      */
 
     return false;

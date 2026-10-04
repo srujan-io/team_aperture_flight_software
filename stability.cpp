@@ -27,10 +27,10 @@ void StabilityController::update(const IMUData& imuData)
 {
     updateState(imuData);
 
-    // --------------------------------
-    // Steering authority
-    // --------------------------------
+    // Flywheel remains available in all states.
+    flywheelAuthority = 1.0f;
 
+    // Steering is only allowed when stable.
     if (state == STABILITY_STABLE)
     {
         steeringAuthority = 1.0f;
@@ -39,38 +39,17 @@ void StabilityController::update(const IMUData& imuData)
     {
         steeringAuthority = 0.0f;
     }
-
-    // --------------------------------
-    // Flywheel remains available
-    // in every stability state
-    // --------------------------------
-
-    flywheelAuthority = 1.0f;
 }
 
-void StabilityController::updateState(
-    const IMUData& imuData
-)
+void StabilityController::updateState(const IMUData& imuData)
 {
-    // ==================================
-    // STABLE
-    // ==================================
-
-    if (state == STABILITY_STABLE)
+    if (outsideLimits(imuData))
     {
-        if (outsideLimits(imuData))
-        {
-            state = STABILITY_UNSTABLE;
-            recoveryStartTime = 0;
-        }
+        state = STABILITY_UNSTABLE;
+        recoveryStartTime = 0;
 
         return;
     }
-
-
-    // ==================================
-    // UNSTABLE
-    // ==================================
 
     if (state == STABILITY_UNSTABLE)
     {
@@ -83,62 +62,44 @@ void StabilityController::updateState(
         return;
     }
 
-
-    // ==================================
-    // RECOVERING
-    // ==================================
-
     if (state == STABILITY_RECOVERING)
     {
-        // If instability returns,
-        // immediately go back to unstable.
-
-        if (outsideLimits(imuData))
+        if (!insideRecoveryLimits(imuData))
         {
             state = STABILITY_UNSTABLE;
             recoveryStartTime = 0;
+
             return;
         }
 
-
-        // Must remain inside recovery
-        // limits continuously.
-
-        if (
-            millis() - recoveryStartTime
-            >= STABILITY_RECOVERY_TIME_MS
-        )
+        if (millis() - recoveryStartTime >=
+            STABILITY_RECOVERY_TIME_MS)
         {
             state = STABILITY_STABLE;
             recoveryStartTime = 0;
         }
+
+        return;
     }
 }
 
 bool StabilityController::outsideLimits(
-    const IMUData& imuData
-) const
+    const IMUData& imuData) const
 {
-    if (
-        fabs(imuData.roll) >
-        STABILITY_ROLL_LIMIT_DEG
-    )
+    if (fabs(imuData.roll) >
+        STABILITY_ROLL_LIMIT_DEG)
     {
         return true;
     }
 
-    if (
-        fabs(imuData.pitch) >
-        STABILITY_PITCH_LIMIT_DEG
-    )
+    if (fabs(imuData.pitch) >
+        STABILITY_PITCH_LIMIT_DEG)
     {
         return true;
     }
 
-    if (
-        fabs(imuData.gz) >
-        STABILITY_YAW_RATE_LIMIT_DPS
-    )
+    if (fabs(imuData.gz) >
+        STABILITY_YAW_RATE_LIMIT_DPS)
     {
         return true;
     }
@@ -147,29 +108,22 @@ bool StabilityController::outsideLimits(
 }
 
 bool StabilityController::insideRecoveryLimits(
-    const IMUData& imuData
-) const
+    const IMUData& imuData) const
 {
-    if (
-        fabs(imuData.roll) >
-        STABILITY_ROLL_RECOVERY_DEG
-    )
+    if (fabs(imuData.roll) >
+        STABILITY_ROLL_RECOVERY_DEG)
     {
         return false;
     }
 
-    if (
-        fabs(imuData.pitch) >
-        STABILITY_PITCH_RECOVERY_DEG
-    )
+    if (fabs(imuData.pitch) >
+        STABILITY_PITCH_RECOVERY_DEG)
     {
         return false;
     }
 
-    if (
-        fabs(imuData.gz) >
-        STABILITY_YAW_RECOVERY_DPS
-    )
+    if (fabs(imuData.gz) >
+        STABILITY_YAW_RECOVERY_DPS)
     {
         return false;
     }

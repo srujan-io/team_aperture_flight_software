@@ -21,13 +21,15 @@ public:
     uint32_t getPacketCount() const;
     uint8_t getFlightState() const;
 
+    void setFlightState(uint8_t state);
+
     void incrementPacketCount();
 
     bool saveRecovery();
 
     TelemetryData buildTelemetry(
         const TelemetryData& sensorData
-);
+    );
 
 private:
 
@@ -39,7 +41,6 @@ private:
 
     bool recoveryAvailable;
 
-    // Recovery save interval
     unsigned long lastRecoverySave;
 
     static const unsigned long

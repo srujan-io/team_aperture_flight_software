@@ -19,9 +19,9 @@ public:
     );
 
     bool load(
-        uint32_t &timestamp,
-        uint32_t &packetCount,
-        uint8_t &flightState
+        uint32_t& timestamp,
+        uint32_t& packetCount,
+        uint8_t& flightState
     );
 
 private:
@@ -40,7 +40,9 @@ private:
 
     static const uint32_t MAGIC = 0x43414E37; // "CAN7"
 
-    uint32_t calculateChecksum(const RecoveryData &data);
+    uint32_t calculateChecksum(
+        const RecoveryData& data
+    );
 };
 
 #endif

@@ -21,31 +21,28 @@ void NavigationValidator::begin()
 
 void NavigationValidator::update(const GNSS& gnss)
 {
-    // --------------------------------
+
     // Position fix
-    // --------------------------------
+
 
     fixValid = gnss.hasFix();
 
 
-    // --------------------------------
     // Satellite count
-    // --------------------------------
+
 
     satellitesValid =
         gnss.getSatellites() >= GNSS_MIN_SATELLITES;
 
 
-    // --------------------------------
     // Course over ground
-    // --------------------------------
+
 
     courseValid = gnss.hasCourse();
 
 
-    // --------------------------------
     // Final navigation decision
-    // --------------------------------
+
 
     navigationValid =
         fixValid &&

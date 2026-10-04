@@ -10,8 +10,7 @@ enum FlightState
     BOOT = 0,
     TEST_MODE,
     LAUNCH_PAD,
-    ASCENT,
-    ROCKET_DEPLOY,
+    DROP_DETECTED,
     DESCENT,
     PARAGLIDER_DEPLOY,
     PARAGLIDE_ACTIVE,
@@ -21,7 +20,6 @@ enum FlightState
 class FlightStateManager
 {
 public:
-
     FlightStateManager();
 
     void begin();
@@ -31,23 +29,17 @@ public:
         DeploymentController& deployment
     );
 
-    void updateTelemetryState(
-        TelemetryData& data
-    );
+    void updateTelemetryState(TelemetryData& data);
 
     FlightState getState() const;
-
     const char* getStateName() const;
 
-    void transitionTo(
-        FlightState newState
-    );
+    void transitionTo(FlightState newState);
 
 private:
-
     FlightState currentState;
 
-    uint8_t apogeeConfirmationCount;
+    uint8_t dropConfirmationCount;
     uint8_t descentConfirmationCount;
 
     float previousAltitude;
@@ -56,76 +48,10 @@ private:
     bool initializationComplete();
     bool testsPassed();
 
-    bool launchDetected(
-        const TelemetryData& data
-    );
-
-    bool apogeeDetected(
-        const TelemetryData& data
-    );
-
-    bool descentConfirmed(
-        const TelemetryData& data
-    );
-
-    bool paragliderAltitudeReached(
-        const TelemetryData& data
-    );
-
-    bool impactDetected(
-        const TelemetryData& data
-    );
-};
-
-
-private:
-
-    FlightState currentState;
-
-
-    // ============================================================
-    // FLIGHT-STATE CONFIRMATION COUNTERS
-    // ============================================================
-    uint8_t apogeeConfirmationCount;
-    uint8_t descentConfirmationCount;
-
-
-    // ============================================================
-    // PREVIOUS ALTITUDE
-    // ============================================================
-
-    float previousAltitude;
-    bool previousAltitudeValid;
-
-
-    // ============================================================
-    // STATE TRANSITION HELPERS
-    // ============================================================
-
-    bool initializationComplete();
-    bool testsPassed();
-
-    bool launchDetected(
-        const TelemetryData& data
-    );
-
-    bool apogeeDetected(
-        const TelemetryData& data
-    );
-
-    bool descentConfirmed(
-        const TelemetryData& data
-    );
-
-    bool paragliderAltitudeReached(
-        const TelemetryData& data
-    );
-
-    
-
-    bool impactDetected(
-        const TelemetryData& data
-    );
+    bool dropDetected(const TelemetryData& data);
+    bool descentConfirmed(const TelemetryData& data);
+    bool paragliderAltitudeReached(const TelemetryData& data);
+    bool impactDetected(const TelemetryData& data);
 };
 
 #endif

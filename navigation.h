@@ -20,7 +20,6 @@ public:
 
 private:
     bool navigationValid;
-
     bool fixValid;
     bool satellitesValid;
     bool courseValid;

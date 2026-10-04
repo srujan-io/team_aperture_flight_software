@@ -36,7 +36,7 @@ bool FlywheelController::begin()
 
 void FlywheelController::update(float gyroZ)
 {
-    if (!initialized)
+    if (!initialized || !active)
         return;
 
     motorCommand = calculateCommand(gyroZ);

@@ -1,119 +1,78 @@
 #include "missionManager.h"
+#include "config.h"
 
+#include <string.h>
 
 MissionManager::MissionManager()
 {
     packetCount = 0;
-
-    flightState = 0;
+    flightState = STATE_BOOT;
 
     recoveryAvailable = false;
-
     lastRecoverySave = 0;
 }
 
 
-// ====================================================
+
 // BEGIN
-// ====================================================
+
 
 bool MissionManager::begin()
 {
     Serial.println("Starting Mission Manager...");
 
 
-    // ------------------------------------------------
-    // Initialize EEPROM recovery
-    // ------------------------------------------------
+    // Initialize recovery
+
 
     if (!recovery.begin())
     {
-        Serial.println(
-            "Recovery initialization failed."
-        );
-
+        Serial.println("Recovery initialization failed.");
         return false;
     }
 
 
-    // ------------------------------------------------
     // Attempt recovery
-    // ------------------------------------------------
+
 
     uint32_t recoveredTimestamp = 0;
     uint32_t recoveredPacketCount = 0;
-    uint8_t recoveredFlightState = 0;
-
+    uint8_t recoveredFlightState = STATE_BOOT;
 
     if (recovery.load(
             recoveredTimestamp,
             recoveredPacketCount,
             recoveredFlightState))
     {
-        // --------------------------------------------
-        // Valid recovery data
-        // --------------------------------------------
-
         recoveryAvailable = true;
 
-        packetCount =
-            recoveredPacketCount;
+        packetCount = recoveredPacketCount;
+        flightState = recoveredFlightState;
 
-        flightState =
-            recoveredFlightState;
+        missionClock.begin(recoveredTimestamp);
 
-        missionClock.begin(
-            recoveredTimestamp
-        );
+        Serial.println("Mission data recovered.");
 
-        Serial.println(
-            "Mission data recovered."
-        );
+        Serial.print("Recovered timestamp: ");
+        Serial.println(recoveredTimestamp);
 
-        Serial.print(
-            "Recovered timestamp: "
-        );
+        Serial.print("Recovered packet count: ");
+        Serial.println(recoveredPacketCount);
 
-        Serial.println(
-            recoveredTimestamp
-        );
-
-        Serial.print(
-            "Recovered packet count: "
-        );
-
-        Serial.println(
-            recoveredPacketCount
-        );
-
-        Serial.print(
-            "Recovered flight state: "
-        );
-
-        Serial.println(
-            recoveredFlightState
-        );
+        Serial.print("Recovered flight state: ");
+        Serial.println(recoveredFlightState);
     }
-
     else
     {
-        // --------------------------------------------
-        // No valid recovery
-        // --------------------------------------------
-
         recoveryAvailable = false;
 
         packetCount = 0;
-
-        flightState = 0;
+        flightState = STATE_BOOT;
 
         missionClock.begin(0);
 
-        Serial.println(
-            "Starting new mission."
-        );
+        Serial.println("Starting new mission.");
     }
-
 
     lastRecoverySave = millis();
 
@@ -121,22 +80,15 @@ bool MissionManager::begin()
 }
 
 
-// ====================================================
+
 // UPDATE
-// ====================================================
+
 
 void MissionManager::update()
 {
-    // Update mission clock
     missionClock.update();
 
-
     unsigned long now = millis();
-
-
-    // ------------------------------------------------
-    // Periodic recovery save
-    // ------------------------------------------------
 
     if (now - lastRecoverySave >=
         RECOVERY_SAVE_INTERVAL)
@@ -148,9 +100,9 @@ void MissionManager::update()
 }
 
 
-// ====================================================
+
 // GET MISSION TIME
-// ====================================================
+
 
 uint32_t MissionManager::getMissionTime() const
 {
@@ -158,9 +110,9 @@ uint32_t MissionManager::getMissionTime() const
 }
 
 
-// ====================================================
+
 // GET PACKET COUNT
-// ====================================================
+
 
 uint32_t MissionManager::getPacketCount() const
 {
@@ -168,9 +120,9 @@ uint32_t MissionManager::getPacketCount() const
 }
 
 
-// ====================================================
+
 // GET FLIGHT STATE
-// ====================================================
+
 
 uint8_t MissionManager::getFlightState() const
 {
@@ -178,9 +130,19 @@ uint8_t MissionManager::getFlightState() const
 }
 
 
-// ====================================================
+
+// SET FLIGHT STATE
+
+
+void MissionManager::setFlightState(uint8_t state)
+{
+    flightState = state;
+}
+
+
+
 // INCREMENT PACKET COUNT
-// ====================================================
+
 
 void MissionManager::incrementPacketCount()
 {
@@ -188,9 +150,9 @@ void MissionManager::incrementPacketCount()
 }
 
 
-// ====================================================
+
 // SAVE RECOVERY
-// ====================================================
+
 
 bool MissionManager::saveRecovery()
 {
@@ -201,18 +163,23 @@ bool MissionManager::saveRecovery()
     );
 }
 
+
+
+// BUILD TELEMETRY
+
+
 TelemetryData MissionManager::buildTelemetry(
     const TelemetryData& sensorData)
 {
     TelemetryData telemetry = sensorData;
 
-    // -----------------------------------------------
+
     // TEAM ID
-    // -----------------------------------------------
+
 
     strncpy(
         telemetry.teamID,
-        "2026-IN-SPACeCAN-7USAT-024",
+        TEAM_ID,
         sizeof(telemetry.teamID) - 1
     );
 
@@ -221,35 +188,93 @@ TelemetryData MissionManager::buildTelemetry(
     ] = '\0';
 
 
-    // -----------------------------------------------
     // MISSION TIME
-    // -----------------------------------------------
+
 
     telemetry.timestamp =
         getMissionTime();
 
 
-    // -----------------------------------------------
     // PACKET COUNT
-    // -----------------------------------------------
+
 
     telemetry.packetCount =
         getPacketCount();
 
 
-    // -----------------------------------------------
     // FLIGHT SOFTWARE STATE
-    //
-    // State transitions are intentionally NOT
-    // implemented yet.
-    // -----------------------------------------------
+
 
     switch (flightState)
     {
-        case 0:
+        case STATE_BOOT:
             strncpy(
                 telemetry.flightSoftwareState,
-                "BOOT",
+                STATE_NAME_BOOT,
+                sizeof(telemetry.flightSoftwareState) - 1
+            );
+            break;
+
+        case STATE_TEST_MODE:
+            strncpy(
+                telemetry.flightSoftwareState,
+                STATE_NAME_TEST_MODE,
+                sizeof(telemetry.flightSoftwareState) - 1
+            );
+            break;
+
+        case STATE_LAUNCH_PAD:
+            strncpy(
+                telemetry.flightSoftwareState,
+                STATE_NAME_LAUNCH_PAD,
+                sizeof(telemetry.flightSoftwareState) - 1
+            );
+            break;
+
+        case STATE_ASCENT:
+            strncpy(
+                telemetry.flightSoftwareState,
+                STATE_NAME_ASCENT,
+                sizeof(telemetry.flightSoftwareState) - 1
+            );
+            break;
+
+        case STATE_ROCKET_DEPLOY:
+            strncpy(
+                telemetry.flightSoftwareState,
+                STATE_NAME_ROCKET_DEPLOY,
+                sizeof(telemetry.flightSoftwareState) - 1
+            );
+            break;
+
+        case STATE_DESCENT:
+            strncpy(
+                telemetry.flightSoftwareState,
+                STATE_NAME_DESCENT,
+                sizeof(telemetry.flightSoftwareState) - 1
+            );
+            break;
+
+        case STATE_PARAGLIDER_DEPLOY:
+            strncpy(
+                telemetry.flightSoftwareState,
+                STATE_NAME_PARAGLIDER_DEPLOY,
+                sizeof(telemetry.flightSoftwareState) - 1
+            );
+            break;
+
+        case STATE_PARAGLIDE_ACTIVE:
+            strncpy(
+                telemetry.flightSoftwareState,
+                STATE_NAME_PARAGLIDE_ACTIVE,
+                sizeof(telemetry.flightSoftwareState) - 1
+            );
+            break;
+
+        case STATE_IMPACT:
+            strncpy(
+                telemetry.flightSoftwareState,
+                STATE_NAME_IMPACT,
                 sizeof(telemetry.flightSoftwareState) - 1
             );
             break;
@@ -266,7 +291,6 @@ TelemetryData MissionManager::buildTelemetry(
     telemetry.flightSoftwareState[
         sizeof(telemetry.flightSoftwareState) - 1
     ] = '\0';
-
 
     return telemetry;
 }
