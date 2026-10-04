@@ -19,8 +19,8 @@ private:
     unsigned long lastSensorUpdate;
     unsigned long lastTelemetryUpdate;
 
-    static const unsigned long SENSOR_INTERVAL = 100;      // 10 Hz
-    static const unsigned long TELEMETRY_INTERVAL = 1000; // 1 Hz
+    static const unsigned long SENSOR_INTERVAL = 100UL;       // 10 Hz
+    static const unsigned long TELEMETRY_INTERVAL = 1000UL;  // 1 Hz
 };
 
 #endif

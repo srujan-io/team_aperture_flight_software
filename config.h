@@ -176,5 +176,16 @@
 // Units: milliseconds
 #define GNSS_MAX_COURSE_AGE_MS         2000UL
 
+//mission manager
+
+#define STATE_BOOT              0
+#define STATE_TEST_MODE         1
+#define STATE_LAUNCH_PAD        2
+#define STATE_DROP_DETECTED     3
+#define STATE_DESCENT            4
+#define STATE_PARAGLIDER_DEPLOY 5
+#define STATE_PARAGLIDE_ACTIVE  6
+#define STATE_IMPACT            7
+
 
 #endif

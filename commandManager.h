@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 
+#include "config.h"
 #include "missionClock.h"
 #include "calibrationManager.h"
 
@@ -32,8 +33,6 @@ private:
     bool telemetryOn;
     bool simulationOn;
 
-    const char* TEAM_ID =
-        "2026-IN-SPACeCAN-7USAT-024";
 
     String makeAck(
         const String& type,

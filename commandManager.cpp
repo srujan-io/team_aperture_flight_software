@@ -11,9 +11,7 @@ CommandManager::CommandManager()
 }
 
 
-// ====================================================
 // BEGIN
-// ====================================================
 
 bool CommandManager::begin(
     MissionClock* clock,
@@ -31,9 +29,7 @@ bool CommandManager::begin(
 }
 
 
-// ====================================================
 // PROCESS COMMAND
-// ====================================================
 
 String CommandManager::processCommand(
     const String& command)
@@ -45,17 +41,27 @@ String CommandManager::processCommand(
     if (cmd.length() == 0)
         return "";
 
-    // ------------------------------------------------
-    // Must begin with CMD
-    // ------------------------------------------------
+
+
+    // COMMAND FORMAT
+
+
+    // Expected:
+    //
+    // CMD,TEAM_ID,TYPE,PARAMETER
+    //
+    // Example:
+    //
+    // CMD,CAN-7USAT-024,CX,ON
+
 
     if (!cmd.startsWith("CMD,"))
         return "NACK,INVALID_FORMAT\r";
 
 
-    // ------------------------------------------------
-    // Check team ID
-    // ------------------------------------------------
+
+    // TEAM ID VALIDATION
+
 
     if (!validateTeamID(cmd))
         return "NACK,INVALID_TEAM_ID\r";
@@ -64,14 +70,14 @@ String CommandManager::processCommand(
     String type =
         getField(cmd, 2);
 
-
     String parameter =
         getField(cmd, 3);
 
 
-    // =================================================
+
     // CX
-    // =================================================
+    // TELEMETRY CONTROL
+
 
     if (type == "CX")
     {
@@ -107,20 +113,34 @@ String CommandManager::processCommand(
     }
 
 
-    // =================================================
+
     // ST
-    // =================================================
+    // TIME SYNCHRONIZATION
+
 
     if (type == "ST")
     {
-        // ---------------------------------------------
-        // GPS synchronization
-        // ---------------------------------------------
+        if (missionClock == nullptr)
+        {
+            return makeAck(
+                type,
+                parameter,
+                false
+            );
+        }
+
+
+
+        // GPS TIME SYNCHRONIZATION
+
 
         if (parameter == "GPS")
         {
-            // GNSS integration will be connected
-            // once CommandManager receives the GNSS object.
+            // GNSS object is not currently connected
+            // to CommandManager.
+            //
+            // This will be connected during final
+            // integration once the GNSS interface is ready.
 
             return makeAck(
                 type,
@@ -130,26 +150,16 @@ String CommandManager::processCommand(
         }
 
 
-        // ---------------------------------------------
-        // Manual UTC time
+
+        // EXPLICIT UTC TIME
         //
         // CMD,TEAM_ID,ST,UTC_TIME,12:46:55
-        // ---------------------------------------------
+
 
         if (parameter == "UTC_TIME")
         {
             String utc =
                 getField(cmd, 4);
-
-            if (missionClock == nullptr)
-            {
-                return makeAck(
-                    type,
-                    parameter,
-                    false
-                );
-            }
-
 
             if (missionClock->setUTC(utc))
             {
@@ -160,7 +170,6 @@ String CommandManager::processCommand(
                 );
             }
 
-
             return makeAck(
                 type,
                 parameter,
@@ -169,24 +178,30 @@ String CommandManager::processCommand(
         }
 
 
-        // Also allow:
+
+        // DIRECT UTC FORMAT
         //
         // CMD,TEAM_ID,ST,12:46:55
-        //
-        if (missionClock != nullptr &&
-            missionClock->parseUTC(
-                parameter,
-                *(new uint8_t),
-                *(new uint8_t),
-                *(new uint8_t)))
-        {
-            missionClock->setUTC(parameter);
 
-            return makeAck(
-                type,
+
+        uint8_t hour = 0;
+        uint8_t minute = 0;
+        uint8_t second = 0;
+
+        if (missionClock->parseUTC(
                 parameter,
-                true
-            );
+                hour,
+                minute,
+                second))
+        {
+            if (missionClock->setUTC(parameter))
+            {
+                return makeAck(
+                    type,
+                    parameter,
+                    true
+                );
+            }
         }
 
 
@@ -198,9 +213,10 @@ String CommandManager::processCommand(
     }
 
 
-    // =================================================
+
     // CAL
-    // =================================================
+    // SENSOR CALIBRATION
+
 
     if (type == "CAL")
     {
@@ -214,9 +230,9 @@ String CommandManager::processCommand(
         }
 
 
-        // ---------------------------------------------
-        // IMU calibration
-        // ---------------------------------------------
+
+        // IMU
+
 
         if (parameter == "IMU")
         {
@@ -231,9 +247,9 @@ String CommandManager::processCommand(
         }
 
 
-        // ---------------------------------------------
-        // BAROMETER calibration
-        // ---------------------------------------------
+
+        // BAROMETER
+
 
         if (parameter == "BARO")
         {
@@ -256,15 +272,16 @@ String CommandManager::processCommand(
     }
 
 
-    // =================================================
+
     // SIM
-    // =================================================
+    // SIMULATION MODE
+
 
     if (type == "SIM")
     {
-        // ---------------------------------------------
+
         // ENABLE
-        // ---------------------------------------------
+
 
         if (parameter == "ENABLE")
         {
@@ -278,9 +295,9 @@ String CommandManager::processCommand(
         }
 
 
-        // ---------------------------------------------
+
         // DISABLE
-        // ---------------------------------------------
+
 
         if (parameter == "DISABLE")
         {
@@ -302,17 +319,15 @@ String CommandManager::processCommand(
     }
 
 
-    // =================================================
+
     // UNKNOWN COMMAND
-    // =================================================
+
 
     return "NACK,UNKNOWN_COMMAND\r";
 }
 
 
-// ====================================================
 // TELEMETRY STATUS
-// ====================================================
 
 bool CommandManager::telemetryEnabled() const
 {
@@ -320,9 +335,7 @@ bool CommandManager::telemetryEnabled() const
 }
 
 
-// ====================================================
 // SIMULATION STATUS
-// ====================================================
 
 bool CommandManager::simulationEnabled() const
 {
@@ -330,9 +343,7 @@ bool CommandManager::simulationEnabled() const
 }
 
 
-// ====================================================
-// ACK
-// ====================================================
+// CREATE ACKNOWLEDGEMENT
 
 String CommandManager::makeAck(
     const String& type,
@@ -340,6 +351,8 @@ String CommandManager::makeAck(
     bool success)
 {
     String response;
+
+    response.reserve(96);
 
     response += "ACK,";
     response += TEAM_ID;
@@ -349,10 +362,12 @@ String CommandManager::makeAck(
     response += parameter;
     response += ",";
 
+
     if (success)
         response += "OK";
     else
         response += "FAIL";
+
 
     response += "\r";
 
@@ -360,9 +375,7 @@ String CommandManager::makeAck(
 }
 
 
-// ====================================================
 // TEAM ID VALIDATION
-// ====================================================
 
 bool CommandManager::validateTeamID(
     const String& command)
@@ -374,9 +387,7 @@ bool CommandManager::validateTeamID(
 }
 
 
-// ====================================================
 // CSV FIELD EXTRACTION
-// ====================================================
 
 String CommandManager::getField(
     const String& command,

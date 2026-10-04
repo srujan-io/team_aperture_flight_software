@@ -7,11 +7,17 @@
 class Storage
 {
 public:
+
     bool begin();
-    bool writeTelemetry(const TelemetryData &data);
+
+    bool writeTelemetry(
+        const TelemetryData& data
+    );
 
 private:
-    const int CS_PIN = 17;
+
+    static const int CS_PIN = 17;
+
     const char* filename = "/telemetry.csv";
 };
 

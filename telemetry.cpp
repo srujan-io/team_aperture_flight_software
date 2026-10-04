@@ -6,11 +6,11 @@ Telemetry::Telemetry()
 }
 
 
-// ====================================================
+// ============================================================
 // CREATE TELEMETRY PACKET
-// ====================================================
+// ============================================================
 
-String Telemetry::createLoRaPacket(
+String Telemetry::createPacket(
     const TelemetryData& data)
 {
     String packet;
@@ -18,16 +18,16 @@ String Telemetry::createLoRaPacket(
     packet.reserve(512);
 
 
-    // ------------------------------------------------
+    // ========================================================
     // REQUIRED COMPETITION TELEMETRY
-    // ------------------------------------------------
+    // ========================================================
 
     // 1. TEAM ID
     packet += data.teamID;
     packet += ",";
 
 
-    // 2. TIME STAMPING
+    // 2. TIME STAMP
     packet += String(data.timestamp);
     packet += ",";
 
@@ -82,17 +82,17 @@ String Telemetry::createLoRaPacket(
     packet += ",";
 
 
-    // 13. ACCEL X
+    // 13. ACCELEROMETER X
     packet += String(data.accelX, 3);
     packet += ",";
 
 
-    // 14. ACCEL Y
+    // 14. ACCELEROMETER Y
     packet += String(data.accelY, 3);
     packet += ",";
 
 
-    // 15. ACCEL Z
+    // 15. ACCELEROMETER Z
     packet += String(data.accelZ, 3);
     packet += ",";
 
@@ -107,21 +107,21 @@ String Telemetry::createLoRaPacket(
     packet += ",";
 
 
-    // ------------------------------------------------
-    // OPTIONAL DATA
-    // ------------------------------------------------
+    // ========================================================
+    // OPTIONAL TELEMETRY
+    // ========================================================
 
     // 18. HUMIDITY
     packet += String(data.humidity, 1);
     packet += ",";
 
 
-    // 19. VELOCITY
+    // 19. VERTICAL VELOCITY
     packet += String(data.velocity, 2);
     packet += ",";
 
 
-    // 20. DISTANCE
+    // 20. DISTANCE TO TARGET
     packet += String(data.distance, 2);
     packet += ",";
 
@@ -146,41 +146,55 @@ String Telemetry::createLoRaPacket(
     packet += ",";
 
 
-    // 25-34. AS7341
+    // ========================================================
+    // AS7341 SPECTRAL DATA
+    // ========================================================
+
+    // 25. F1
     packet += String(data.spectralF1);
     packet += ",";
 
+    // 26. F2
     packet += String(data.spectralF2);
     packet += ",";
 
+    // 27. F3
     packet += String(data.spectralF3);
     packet += ",";
 
+    // 28. F4
     packet += String(data.spectralF4);
     packet += ",";
 
+    // 29. F5
     packet += String(data.spectralF5);
     packet += ",";
 
+    // 30. F6
     packet += String(data.spectralF6);
     packet += ",";
 
+    // 31. F7
     packet += String(data.spectralF7);
     packet += ",";
 
+    // 32. F8
     packet += String(data.spectralF8);
     packet += ",";
 
+    // 33. CLEAR
     packet += String(data.spectralClear);
     packet += ",";
 
+    // 34. NIR
     packet += String(data.spectralNIR);
 
 
-    // ------------------------------------------------
-    // COMPETITION REQUIRES CARRIAGE RETURN
-    // ------------------------------------------------
+    // ========================================================
+    // COMPETITION FORMAT
+    // ========================================================
 
+    // ASCII carriage return
     packet += "\r";
 
 

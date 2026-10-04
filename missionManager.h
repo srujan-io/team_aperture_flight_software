@@ -43,8 +43,7 @@ private:
 
     unsigned long lastRecoverySave;
 
-    static const unsigned long
-        RECOVERY_SAVE_INTERVAL = 1000;
+    static const unsigned long RECOVERY_SAVE_INTERVAL = 1000UL;
 };
 
 #endif

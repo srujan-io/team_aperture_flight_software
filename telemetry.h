@@ -10,7 +10,7 @@ public:
 
     Telemetry();
 
-    String createLoRaPacket(
+    String createPacket(
         const TelemetryData& data
     );
 };
